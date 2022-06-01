@@ -1,0 +1,10 @@
+{
+    "commands": [
+        {
+            "name": "ping",
+            "description": "Répond pong",
+            "options": [],
+            "perms": "everyone"
+        }
+    ]
+}
