@@ -3,9 +3,13 @@ import * as Whatsapp from 'whatsapp-web.js';
 import { readdirSync } from 'fs';
 import { JsonDB } from 'node-json-db';
 import { Config } from 'node-json-db/dist/lib/JsonDBConfig.js';
+import qrcode from 'qrcode-terminal';
+import { Chat } from './libs/Chat.js';
+import fs from 'fs';
 
 // Import config
 const config = new JsonDB(new Config("config", true, true, '/'));
+const db = new JsonDB(new Config("db", true, true, '/'));
 
 // Log with the current date
 export async function log(msg) {
@@ -18,15 +22,37 @@ export async function log_error(msg) {
 	await (await d_client.users.fetch(config.getData("/creator_id"))).send(`:warning: ERROR: ${msg}`);
 }
 
+//**** Saving Session **** //
+//Now have the session file path reference
+const SESSION_FILE_PATH = "/.wwebjs_auth";
+let sessionData;
+if (fs.existsSync(SESSION_FILE_PATH)) {
+    sessionData = SESSION_FILE_PATH;
+}
+//new client method
+const w_client = new Whatsapp.Client({
+    authStrategy: new Whatsapp.default.LocalAuth({ clientId: "694235386658160760", qrTimeoutMs: 0, userDataDir: sessionData })
+});
+w_client.on('qr', (qr) => {
+    log('Whatsapp QR RECEIVED', qr);
+    qrcode.generate(qr, { small: true });
+});
+w_client.on("authenticated", () => {
+    if(sessionData){
+        log('Connection has been established')
+    }
+});
+
+/*
 // Create a new client instance for Whatsapp
-let w_client = new Whatsapp.Client();
+let w_client = new Whatsapp.Client({
+    auth: new Whatsapp.default.LocalAuth({ clientId: '694235386658160760' })
+});
 w_client.on('qr', (qr) => {
     console.log('Whatsapp QR RECEIVED', qr);
+    qrcode.generate(qr, {small: true});
 });
-w_client.on('ready', () => {
-    console.log('Whatsapp client is ready!');
-});
-w_client.initialize();
+*/
 
 // Create a new client instance for Discord
 const d_client = new Discord.Client({ intents: [
@@ -38,6 +64,18 @@ const d_client = new Discord.Client({ intents: [
 d_client.once('ready', async () => {
 	await log('Discord bot logged !');
 });
+let test_chat;
+w_client.once('ready', () => {
+    log('Whatsapp client is ready!');
+	console.debug(w_client);
+	test_chat = new Chat(d_client, w_client, config, db, "981531692240076810", "120363022823626173@g.us");
+});
+w_client.on('message', message => {
+	console.log(message);
+});
+w_client.initialize();
+
+
 
 // Set listeners
 let cmd_listener = async interaction => {
@@ -49,7 +87,7 @@ let cmd_listener = async interaction => {
 
 		log(`${interaction.user.username} execute ${commandName}`);
 
-		await command.execute(interaction, config);
+		await command.execute(interaction, config, db);
 	}
 }
 
